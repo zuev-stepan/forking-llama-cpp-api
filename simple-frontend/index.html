@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat</title>
+    <style>
+        .input {
+            background-color: lightblue;
+            margin-left: auto;
+            margin-right: 10px;
+            text-align: right;
+            width: 70%;
+        }
+
+        .error {
+            background-color: salmon;
+            margin-left: 10px;
+            margin-right: auto;
+            text-align: left;
+            width: 70%;
+        }
+
+        .output {
+            background-color: lightblue;
+            margin-left: 10px;
+            margin-right: auto;
+            text-align: left;
+            width: 70%;
+        }
+
+        #submit-button {
+            padding: 19px 29px;
+            border: none;
+            vertical-align: top;
+            margin-right: 0px;
+            background: lightblue;
+        }
+    </style>
+
+    <script>
+        function show_error(message)
+        {
+            const chatWindow = document.getElementById("chat-window");
+            const errorMessage = document.createElement("p");
+            errorMessage.setAttribute("class", "error");
+            errorMessage.innerText = message;
+            chatWindow.append(errorMessage);
+        }
+
+        async function create()
+        {
+            const name = document.getElementById("chat-name").value;
+            const prompt = document.getElementById("prompt").value;
+
+            const response = await fetch("http://localhost:8880/init", {method: "POST", body: prompt});
+            const json = await response.json();
+            if ("error" in json)
+            {
+                show_error(json["error"]);
+                return;
+            }
+
+            const id = json["id"];
+
+            const chatSelector = document.getElementById("chat-selector");
+            const option = document.createElement("option");
+            option.value = id;
+            option.innerText = name;
+            chatSelector.append(option);
+            chatSelector.value = id;
+        }
+
+        async function fork()
+        {
+            const name = document.getElementById("chat-name").value;
+            const chatSelector = document.getElementById("chat-selector");
+            const chatId = chatSelector.value;
+
+            const response = await fetch("http://localhost:8880/fork/" + chatId, {method: "POST"});
+            const json = await response.json();
+            if ("error" in json)
+            {
+                show_error(json["error"]);
+                return;
+            }
+
+            const id = json["id"];
+
+            const option = document.createElement("option");
+            option.value = id;
+            option.innerText = name;
+            chatSelector.append(option);
+            chatSelector.value = id;
+        }
+
+        async function stop()
+        {
+            const chatSelector = document.getElementById("chat-selector");
+            const chatId = chatSelector.value;
+
+            const response = await fetch("http://localhost:8880/stop/" + chatId, {method: "POST"});
+            const json = await response.json();
+            if ("error" in json)
+            {
+                show_error(json["error"]);
+                return;
+            }
+        }
+
+        async function send()
+        {
+            const input = document.getElementById("message").value;
+
+            const chatSelector = document.getElementById("chat-selector");
+            const chatId = chatSelector.value;
+
+            const chatWindow = document.getElementById("chat-window");
+            const inputMessage = document.createElement("p");
+            inputMessage.setAttribute("class", "input");
+            inputMessage.innerText = input;
+            chatWindow.append(inputMessage);
+
+            const response = await fetch("http://localhost:8880/send/" + chatId, {method: "POST", body: input});
+            const json = await response.json();
+            if ("error" in json)
+            {
+                show_error(json["error"]);
+                return;
+            }
+            document.getElementById("message").value = "";
+
+            const outputMessage = document.createElement("p");
+            outputMessage.setAttribute("class", "output");
+            outputMessage.innerText = chatSelector.options[chatSelector.selectedIndex].text + ":\n";
+            chatWindow.append(outputMessage);
+
+            const button = document.getElementById("submit-button");
+            button.onclick = stop;
+            button.innerText = "Stop";
+            button.style.background = "lightpink";
+
+            var timer = setInterval(async () =>
+            {
+                const stop = () =>
+                {
+                    outputMessage.innerText = outputMessage.innerText.replace("### Human:", "");
+                    clearInterval(timer);
+                    button.onclick = send;
+                    button.style.background = "lightblue";
+                    button.innerText = "Send";
+                };
+
+                try
+                {
+                    const response = await fetch("http://localhost:8880/update/" + chatId, {method: "GET"});
+                    const json = await response.json();
+                    if ("error" in json)
+                    {
+                        show_error(json["error"]);
+                        return;
+                    }
+
+                    outputMessage.innerText += json["update"];
+                    if (json["finished"] === 1)
+                    {
+                        stop();
+                    }
+                }
+                catch (error)
+                {
+                    show_error(error);
+                    stop();
+                }
+            }, 20);
+        }
+    </script>
+</head>
+
+<body onload="get_chats()" style="max-width: 900px;">
+    <script>
+        async function get_chats()
+        {
+            const response = await fetch("http://localhost:8880/chats", {method: "GET"});
+            const json = await response.json();
+            if ("error" in json)
+            {
+                show_error(json["error"]);
+                return;
+            }
+
+            const chatSelector = document.getElementById("chat-selector");
+            for (const id of json["ids"])
+            {
+                const option = document.createElement("option");
+
+                option.value = id;
+                option.innerText = id;
+                chatSelector.append(option);
+            }
+        }
+    </script>
+
+    <div id="chat-creator-div" style="height: 600px; width: 400px; float: left;">
+        <label for="chat-name">Name</label>
+        </br>
+        <input id="chat-name" style="width: 100%" value="dan"></input>
+        </br>
+
+        <label for="prompt">Prompt</label>
+        </br>
+        <textarea id="prompt" style="width: 100%; height: 100%">Below is an instruction that describes a task. Write a response that appropriately completes the request.</textarea>
+        </br>
+
+        <button onclick="create()">Create</button>
+    </div>
+
+    <div id="chat-div" style="height: 600px; width: 400px; float: right;">
+        <label for="chat-selector">Select chat</label>
+        <select id="chat-selector">
+        </select>
+        <button onclick="fork()">Fork</button>
+
+        <div id="chat-window" style="overflow-y: scroll; flex-direction: column-reverse; height: 100%">
+        </div>
+
+        <div style="padding-top: 5px">
+            <textarea id="message" rows="3" style="width: 75%"></textarea>
+            <button id="submit-button" onclick="send()">Send</button>
+        </div>
+    </div>
+</body>
+</html>

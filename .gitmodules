@@ -1,0 +1,12 @@
+[submodule "lib/llama.cpp"]
+	path = lib/llama.cpp
+	url = git@github.com:zuev-stepan/llama.cpp.git
+[submodule "lib/cpp-httplib"]
+	path = lib/cpp-httplib
+	url = git@github.com:zuev-stepan/cpp-httplib.git
+[submodule "lib/cpp-ipc"]
+	path = lib/cpp-ipc
+	url = git@github.com:zuev-stepan/cpp-ipc.git
+[submodule "lib/PolyM"]
+	path = lib/PolyM
+	url = git@github.com:zuev-stepan/PolyM.git
